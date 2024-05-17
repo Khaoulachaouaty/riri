@@ -1,0 +1,424 @@
+import { useEffect, useState } from "react";
+import {
+  Typography,
+  Box,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+} from "@mui/material";
+import Header from "../../components/Header";
+import "./style.css";
+import { demandePRService } from "../../services/demandePR_service";
+import { demandeurService } from "../../services/demandeur_service";
+
+const DemandePieceRechange = () => {
+  const theme = useTheme();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [demandeEnCours, setDemandeEnCours] = useState(null);
+  const [confirmationMessage, setConfirmationMessage] = useState("");
+  const [demandes, setDemandes] = useState({});
+  const [demandeurInfos, setDemandeurInfos] = useState({}); // État pour stocker les informations sur les demandeurs
+
+  const openDialog = (demande) => {
+    setDemandeEnCours(demande);
+    setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    // Réinitialiser le message de confirmation
+    setConfirmationMessage("");
+  };
+
+  const accepterDemande = () => {
+    // Simulation de vérification de stock
+    const stockDisponible = true; // Modifier selon la disponibilité réelle du stock
+
+    if (stockDisponible) {
+      setConfirmationMessage("Demande réussie : stock disponible.");
+    } else {
+      setConfirmationMessage("Demande échouée : stock non disponible.");
+    }
+  };
+
+  console.log("demande", demandes);
+
+  const annulerDemande = () => {
+    console.log("Demande annulée avec succès", demandeEnCours);
+    closeDialog();
+  };
+
+  const styles = {
+    mainContainer: {
+      minHeight: "calc(100vh - 64px)",
+      backgroundColor: theme.palette.mode === "light" ? "#f6f6f6" : "#0f0f0f",
+    },
+    tableContainer: {
+      backgroundColor: theme.palette.mode === "light" ? "#f6f7f8" : "#262626",
+      padding: "20px",
+      borderRadius: "15px",
+      marginTop: "20px",
+    },
+    demandeTitle: {
+      fontSize: "24px",
+      fontWeight: "bold",
+      color: theme.palette.primary.main,
+    },
+    demandeSubtitle: {
+      marginLeft: "20px",
+      marginBottom: "10px",
+      fontSize: "16px",
+      color: theme.palette.primary.main,
+    },
+    tableHeader: {
+      backgroundColor: "#1976d2",
+      color: "#fff",
+    },
+    tableCell: {
+      backgroundColor: theme.palette.mode === "light" ? "#f6f7f8" : "#262626",
+    },
+    buttonTraitrer: {
+      textAlign: "right",
+      marginTop: "10px",
+    },
+    dialogContent: {
+      // Styles spécifiques au contenu du dialogue
+      marginBottom: "10px",
+      color: "#555", // Couleur du contenu
+    },
+    dialogActions: {
+      // Styles spécifiques aux actions du dialogue
+      justifyContent: "center", // Centrer les boutons
+      //color: "#555",
+    },
+    newDemandeRow: {
+      backgroundColor: "#a0c8ff", // Couleur de fond pour les nouvelles demandes
+    },
+  };
+
+  const buttonStyles = {
+    backgroundColor: "#698b8e",
+    color: "#fff",
+    borderRadius: "10px",
+    padding: "10px 20px",
+    fontWeight: "bold",
+    textTransform: "none",
+    transition: "background-color 0.3s",
+    "&:hover": {
+      backgroundColor: "#547175",
+    },
+  };
+  // Fonction pour regrouper les demandes par interCode
+  const groupDemandesByInterCode = (demandes) => {
+    const groupedDemandes = {};
+    demandes.forEach((demande) => {
+      const interCode =
+        demande.ticket && typeof demande.ticket === "object"
+          ? demande.ticket.interCode
+          : demande.ticket;
+      if (!groupedDemandes[interCode]) {
+        groupedDemandes[interCode] = [];
+      }
+      groupedDemandes[interCode].push(demande);
+    });
+    return groupedDemandes;
+  };
+
+  const getAllDemandeurInfos = async (demandes) => {
+    const infos = {};
+    for (const interCode in demandes) {
+      const demandeGroup = demandes[interCode];
+      const firstDemande = demandeGroup[0];
+      const demandeurId = firstDemande.ticket.demandeur;
+      try {
+        const response = await demandeurService.getDemandeur(demandeurId);
+        infos[interCode] = response.data;
+      } catch (error) {
+        console.error(
+          `Error fetching demandeur data for interCode ${interCode}:`,
+          error
+        );
+        infos[interCode] = null;
+      }
+    }
+    return infos;
+  };
+
+  const loadAndGroupDemandes = async () => {
+    try {
+      const response = await demandePRService.getAllDemandePR();
+      const groupedDemandes = groupDemandesByInterCode(response.data);
+      setDemandes(groupedDemandes);
+      const infos = await getAllDemandeurInfos(groupedDemandes);
+      setDemandeurInfos(infos);
+    } catch (error) {
+      console.error("Error fetching ticket data:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadAndGroupDemandes();
+  }, []);
+
+  console.log("000", demandeurInfos);
+  console.log(demandes);
+
+  return (
+    <Box component="main" sx={styles.mainContainer}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 2,
+        }}
+      >
+        <Typography
+          color="#aebfcb"
+          fontSize="30px"
+          margin="5px"
+          sx={{ fontWeight: 500 }}
+        >
+          Pièces de rechange
+        </Typography>
+      </Box>
+
+      <Box
+        sx={{
+          backgroundColor:
+            theme.palette.mode === "light"
+              ? theme.palette.background.main
+              : theme.palette.background.main,
+          padding: "20px",
+          borderRadius: "15px",
+        }}
+      >
+        {/* Autres éléments de votre interface */}
+        {Object.keys(demandes).map((interCode) => {
+          const demandeGroup = demandes[interCode];
+          const firstDemande = demandeGroup[0];
+          const demandeurInfo = demandeurInfos[interCode];
+          let nomSociete = "";
+          let nomUtilisateur = "";
+          let prenomUtilisateur = "";
+          let eqptDesignation = "";
+
+          if (demandeurInfo && demandeurInfo.client) {
+            nomSociete = demandeurInfo.client.nomSociete;
+            nomUtilisateur = demandeurInfo.user.nom;
+            prenomUtilisateur = demandeurInfo.user.prenom;
+          } else if (typeof firstDemande.ticket.demandeur === "object") {
+            nomSociete = firstDemande.ticket.demandeur.client.nomSociete;
+            nomUtilisateur = firstDemande.ticket.demandeur.user.nom;
+            prenomUtilisateur = firstDemande.ticket.demandeur.user.prenom;
+          }
+
+          if (firstDemande.ticket.equipement) {
+            eqptDesignation = firstDemande.ticket.equipement.eqptDesignation;
+          }
+
+          return (
+            <TableContainer
+              key={interCode}
+              component={Paper}
+              sx={styles.tableContainer}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  color="primary"
+                  sx={styles.demandeTitle}
+                >
+                  {nomSociete}
+                  <Box
+                    sx={{
+                      display: "inline-block",
+                      verticalAlign: "middle",
+                      marginLeft: "10px",
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      color="primary"
+                      sx={{ fontSize: "16px", fontWeight: "bold" }}
+                    >
+                      ({prenomUtilisateur} {nomUtilisateur})
+                    </Typography>
+                  </Box>
+                </Typography>
+                <Typography
+                  variant="subtitle1"
+                  color="#bf5037"
+                  sx={{ fontSize: "18px", fontWeight: "bold" }}
+                >
+                  {firstDemande.statutDemande}
+                </Typography>
+              </Box>
+              <Typography
+                variant="subtitle1"
+                color="primary"
+                sx={{ marginBottom: 1 }}
+              >
+                {eqptDesignation} - {interCode}
+              </Typography>
+              <Table sx={{ minWidth: 300 }}>
+                <TableHead sx={styles.tableHeader}>
+                  <TableRow>
+                    <TableCell sx={styles.tableCell}>Article</TableCell>
+                    <TableCell sx={styles.tableCell}>Quantité</TableCell>
+                    <TableCell sx={styles.tableCell}>Etat</TableCell>{" "}
+                    {/* Renommé de "État" à "Statut" */}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {demandeGroup.map((articleDemande, index) => (
+                    <TableRow
+                      key={index}
+                      className={
+                        articleDemande.etat === "Nouveau"
+                          ? "nouveau-row"
+                          : "ancien-row"
+                      }
+                    >
+                      <TableCell sx={styles.tableCell}>
+                        {articleDemande.art}
+                      </TableCell>
+                      <TableCell sx={styles.tableCell}>
+                        {articleDemande.quantiteDemande}
+                      </TableCell>
+                      <TableCell sx={styles.tableCell}>
+                        {articleDemande.etat}
+                      </TableCell>{" "}
+                      {/* Modification ici */}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <Box sx={styles.buttonTraitrer}>
+                <Button
+                  variant="contained"
+                  sx={buttonStyles}
+                  onClick={() => openDialog(demandeGroup)}
+                >
+                  Traiter
+                </Button>
+              </Box>
+            </TableContainer>
+          );
+        })}
+      </Box>
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+        }}
+      >
+        <Dialog
+          open={dialogOpen}
+          onClose={closeDialog}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              borderRadius: "10px",
+            },
+          }}
+        >
+          <DialogTitle sx={{ textAlign: "center" }}>
+            Traitement de la demande
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ textAlign: "center" }}>
+              {confirmationMessage}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions
+            sx={{ justifyContent: "center", paddingBottom: "20px" }}
+          >
+            {confirmationMessage === "" ? (
+              <>
+                <Button
+                  onClick={closeDialog}
+                  variant="contained"
+                  sx={{
+                    backgroundColor:
+                      theme.palette.mode === "light" ? "#c23c45" : "#2b9c56",
+                    color: "#fff",
+                    margin: "0 10px",
+                    "&:hover": {
+                      backgroundColor:
+                        theme.palette.mode === "light" ? "#9c2b36" : "#20803f",
+                    },
+                    borderRadius: 20,
+                    padding: "10px 20px",
+                  }}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  onClick={accepterDemande}
+                  variant="contained"
+                  sx={{
+                    backgroundColor:
+                      theme.palette.mode === "light" ? "#2a6b38" : "#2b9c56",
+                    color: "#fff",
+                    margin: "0 10px",
+                    "&:hover": {
+                      backgroundColor:
+                        theme.palette.mode === "light" ? "#255630" : "#20803f",
+                    },
+                    borderRadius: 20,
+                    padding: "10px 20px",
+                  }}
+                >
+                  Accepter
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={closeDialog}
+                variant="contained"
+                sx={{
+                  backgroundColor:
+                    theme.palette.mode === "light" ? "#4CAF50" : "#2b9c56",
+                  color: "#fff",
+                  margin: "0 10px",
+                  "&:hover": {
+                    backgroundColor:
+                      theme.palette.mode === "light" ? "#4CAF50" : "#20803f",
+                  },
+                  borderRadius: 20,
+                  padding: "10px 20px",
+                }}
+              >
+                Sortir
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </Box>
+  );
+};
+
+export default DemandePieceRechange;
